@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        version: v1
+        app: {{ .Values.appName }}
+      annotations:
+        checksum/config: {{ tpl (.Files.Get "topicsConf.json") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.micronautPort }}"
+        prometheus.io/path: "/prometheus"
+    spec:
+      containers:
+        - name: {{ .Values.appName }}
+          image: "{{ .Values.imageRepository }}:{{ .Values.imageTag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.micronautPort }}
+          env:
+            - name: ENABLE_NR_METRICS
+              value: "{{ .Values.newrelic.enable }}"
+      restartPolicy: Always

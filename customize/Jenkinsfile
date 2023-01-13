@@ -1,0 +1,111 @@
+#!groovy
+
+def buildScript
+
+pipeline {
+
+    parameters {
+        string(defaultValue: 'xx', description: "jenkins build node label", name: 'JENKINS_NODE_LABEL')
+        string(defaultValue: 'xx', description: "Jenkins instance name", name: 'JENKINS_NAME')
+        string(defaultValue: 'xx', description: "GIT credentials ID", name: 'GIT_CREDENTIALS')
+        string(defaultValue: 'xx', description: "Artifactory credentials ID", name: 'ARTIFACTORY_CREDENTIALS')
+        string(defaultValue: 'xx', description: "Sonarqube token", name: 'SONAR_TOKEN')
+        string(defaultValue: 'xx', description: "BitBucket build status url", name: 'BITBUCKET_BS_URL')
+        string(defaultValue: 'xx', description: "BitBucket credentials ID for build status (same as git credentials in current environment)", name: 'BITBUCKET_CREDS')
+        string(defaultValue: 'xx', description: "aws key id", name: 'AWS_ACCESS_KEY_ID_CREDS')
+        string(defaultValue: 'xx', description: "aws key secret", name: 'AWS_SECRET_ACCESS_KEY_CREDS')
+    }
+
+    agent {
+        label params.JENKINS_NODE_LABEL
+    }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage("Initialize") {
+            steps {
+                script {
+                    buildScript = load("customize/pipelineBuild.groovy")
+                }
+            }
+        }
+
+        stage("Build") {
+            steps {
+                timeout(time: 20, unit: 'MINUTES') {
+                    script {
+                        buildScript.buildArtifact(env.BRANCH_NAME)
+                    }
+                }
+            }
+        }
+
+        stage("Generate coverage reports") {
+            steps {
+                timeout(time: 20, unit: 'MINUTES') {
+                    script {
+                        buildScript.generateReports(env.BRANCH_NAME)
+                    }
+                }
+            }
+        }
+/*
+        stage("Sonarqube analysis") {
+            steps {
+                timeout(time: 20, unit: 'MINUTES') {
+                    script {
+                        buildScript.qualityReport(env.BRANCH_NAME, params.SONAR_TOKEN)
+                    }
+                }
+            }
+        }
+
+        stage("Publish reports") {
+            steps {
+                echo "Publish JUnit test result report"
+                junit healthScaleFactor: 1.0, keepLongStdio: true, testResults: 'build/test-results/test/**.xml'
+                script {
+                    echo "Publish HTML reports"
+                    buildScript.publishTestReports("build/reports/tests/test", "Test execution report")
+                    buildScript.publishTestReports("build/reports/dependency-license", "Dependencies licenses report")
+                    buildScript.publishTestReports("build/reports/jacoco", "Jacoco coverage report")
+                }
+            }
+        }
+
+
+        stage("Upload jar & run XRAY") {
+            steps {
+                script {
+                    buildScript.uploadJarToArtifactory(env.BRANCH_NAME, params.ARTIFACTORY_CREDENTIALS)
+                }
+            }
+        }
+*/
+        stage("Upload docker image to Repositories (Artifactory & ACR & ECR)") {
+            steps {
+                script {
+                    buildScript.uploadImageToRegistries(env.BRANCH_NAME, ARTIFACTORY_CREDENTIALS_ID, "acr-credentials-id-v2",JENKINS_NAME)
+                }
+            }
+        }
+
+        stage("Upload helm charts to Artifactory") {
+            steps {
+                script {
+                    buildScript.buildUploadHelmToArtifactory(env.BRANCH_NAME, params.ARTIFACTORY_CREDENTIALS)
+                    buildScript.publishTestReports("build/reports/helm", "Helm chart upload report")
+                }
+            }
+        }
+    }
+
+    post{
+        always{
+            cleanWs()
+        }
+    }
+}

@@ -1,0 +1,6 @@
+micronautPort: 6666
+appName: content-generator
+imageRepository:
+imageTag:
+newrelic:
+  enable: true

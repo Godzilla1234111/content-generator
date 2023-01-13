@@ -1,0 +1,79 @@
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+
+        maven {
+            url "https://artifactory.intra.nexthink.com/artifactory/libs-release/"
+        }
+
+        // For running in AWS with no access to Nexthink's Artifactory
+        flatDir { dirs "dependencies" }
+    }
+
+    dependencies {
+        classpath "com.nexthink.gradle:java-gradle-scaffold:1.19.0"
+
+    }
+
+}
+
+plugins {
+    id "com.diffplug.spotless" version "5.10.2"
+    id "com.github.ben-manes.versions" version "0.38.0"
+
+}
+
+version = "0.1"
+group = "com.nexthink.gq"
+
+
+apply plugin: "com.nexthink.java-gradle-scaffold"
+javascaffold {
+    context = "nxcloud"
+    group = "com.nexthink.gq"
+    name = "content-generator"
+    artifactVersion ="1.0.0"
+    description = "reza Content-Generator project"
+    mainClass = "com.nexthink.ContentGenerator.Application"
+    imageTags = [getMainImageTag(), "latest"]
+    ecrSync = true
+}
+
+allprojects {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// Populate needed parameters
+ext {
+    dockerImage = jib.to.image
+    dockerTag = javascaffold.getMainImageTag()
+}
+
+/*task buildTestDockerImage(type: Exec) {
+    group "nxttest"
+    workingDir "$projectDir"
+    commandLine "docker", "build", "--rm", "-t", "${dockerImage}:${dockerTag}", "-t", "${dockerImage}:latest", "."
+}*/
+
+
+
+// Bundle the project dependencies
+task bundleDependencies(type: Tar) {
+    dependencies {
+        implementation "com.nexthink.gradle:java-gradle-scaffold:1.19.0"
+    }
+    archiveFileName = "itgDependencies.tar"
+    configurations.each { configuration ->
+        if (configuration.canBeResolved) {
+            from configuration
+        }
+    }
+}
+
+// don't change apply ordering
+apply from: "${rootDir}/gradle/dependencies.gradle"
+//apply from: "${rootDir}/gradle/testing.gradle"
+//apply from: "${rootDir}/gradle/spotless.gradle"

@@ -1,0 +1,31 @@
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
+tasks.withType(Test) {
+
+    // Forcing rerun-tasks for tests
+    outputs.upToDateWhen {false}
+
+    testLogging {
+        events TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.STANDARD_ERROR
+        exceptionFormat TestExceptionFormat.FULL
+        showExceptions true
+        showCauses true
+        showStackTraces true
+    }
+
+    jvmArgs "-noverify", "-XX:TieredStopAtLevel=1"
+
+    beforeTest { descriptor ->
+        logger.lifecycle("Running test: {}.{}", descriptor.className, descriptor.name)
+    }
+}
+
+// General testing task
+test {
+    // Default tag is SanityChecks
+    String testTag = project.hasProperty("testTag") ? project.property("testTag") : 'SanityChecks'
+    useJUnitPlatform() {
+        includeTags testTag
+    }
+}
